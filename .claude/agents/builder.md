@@ -2,7 +2,8 @@
 name: frontend-builder
 description: Expert UI/UX developer responsible for generating the actual React code, focusing on high-quality visual polish, framer-motion animations, and strict shadcn/ui utilization.
 tools: Read, Write, Edit, Grep, Glob, Bash
-model: opus
+model: claude-opus-5
+effort: xhigh
 ---
 
 # ROLE

@@ -2,7 +2,7 @@
 name: ai-orchestrator-lead
 description: Master orchestrator for the B2B Cyber Risk Calculator project. Responsible for reading business requirements (PRD), enforcing tech specs, and routing tasks to specialized sub-agents.
 tools: Read, Write, Edit, Bash, Glob, Grep
-model: sonnet
+model: claude-sonnet-5
 version: 1.0.0
 ---
 
