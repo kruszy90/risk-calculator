@@ -11,11 +11,8 @@ import {
   TriangleAlert,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import {
-  CollapsibleReveal,
-  PANEL_DURATION_S,
-  PANEL_EXIT_MS,
-} from "@/components/collapsible-reveal"
+import { CHROME_ENTER_DELAY_MS, INSTANT, PANEL_ENTER, PANEL_EXIT } from "@/lib/motion"
+import { CollapsibleReveal } from "@/components/collapsible-reveal"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -36,12 +33,11 @@ import { EMAIL_PATTERN, EMPTY_LEAD, PRIMARY_CTA } from "./constants"
 import { Field } from "./field"
 import { HintPopover } from "./hint-popover"
 import { PanelHeading } from "./panel-heading"
+import { PanelStage } from "./panel-stage"
 import { ProcessingView } from "./processing-view"
 import { ResultView } from "./result-view"
 import { TileGroup } from "./tile-group"
 import type { LeadErrors, LeadForm, Step } from "./types"
-
-const stepTransition = { duration: PANEL_DURATION_S, ease: "easeOut" as const }
 
 export function CyberRiskCalculator({
   onStepChange,
@@ -94,10 +90,38 @@ export function CyberRiskCalculator({
     onStepChangeRef.current = onStepChange
   }, [onStepChange])
 
+  // Read at call time for the same reason: goToStep must not change identity.
+  const reducedMotionRef = React.useRef(false)
+  React.useEffect(() => {
+    reducedMotionRef.current = Boolean(prefersReducedMotion)
+  }, [prefersReducedMotion])
+
   const goToStep = React.useCallback((next: Step) => {
     setHasNavigated(true)
     setStep(next)
     onStepChangeRef.current?.(next)
+
+    /*
+     * The widget is the whole page and the panels are wildly different lengths,
+     * so a step taken from the bottom of a long one would land the user in the
+     * middle of the next — or throw them upwards as the browser clamps the
+     * scroll to a document that just got shorter. Taking them to the top
+     * ourselves turns that snap into part of the same movement.
+     *
+     * Two frames late on purpose: anything animating to height:auto is measured
+     * by framer-motion on the frame after the commit, and it brackets that
+     * measurement with a scroll save/restore that would undo a scroll issued
+     * now. This runs once that pass is over.
+     */
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (window.scrollY === 0) return
+        window.scrollTo({
+          top: 0,
+          behavior: reducedMotionRef.current ? "auto" : "smooth",
+        })
+      })
+    })
   }, [])
 
   const industryControls = useAnimationControls()
@@ -213,14 +237,18 @@ export function CyberRiskCalculator({
     return () => window.clearTimeout(timeout)
   }, [announce, goToStep, isSubmitting])
 
-  const motionProps = prefersReducedMotion
-    ? {}
-    : {
-        initial: { opacity: 0, y: 15 },
-        animate: { opacity: 1, y: 0 },
-        exit: { opacity: 0, y: -15 },
-        transition: stepTransition,
-      }
+  /*
+   * Opacity only — a y-translate on top of the fade reads as a jolt. The two
+   * fades overlap rather than queue: the incoming panel starts before the
+   * outgoing one is gone, so there is never a beat where the card is empty.
+   * Reduced motion swaps the transition, not the props, so the markup the
+   * server sends matches whatever the visitor prefers.
+   */
+  const motionProps = {
+    initial: { opacity: 0 },
+    animate: { opacity: 1, transition: prefersReducedMotion ? INSTANT : PANEL_ENTER },
+    exit: { opacity: 0, transition: prefersReducedMotion ? INSTANT : PANEL_EXIT },
+  }
 
   /** Title block rendered above the card, once the questionnaire is done. */
   const outsideHeading: {
@@ -272,9 +300,9 @@ export function CyberRiskCalculator({
           >
             <PanelHeading
               autoFocus={hasNavigated}
-              // The block is still collapsed for PANEL_EXIT_MS; focusing before
-              // it has height would scroll the page to a zero-height box.
-              focusDelayMs={PANEL_EXIT_MS}
+              // The block stays collapsed until the outgoing one has gone;
+              // focusing before it has height would aim at a zero-height box.
+              focusDelayMs={CHROME_ENTER_DELAY_MS}
               className="rounded-md text-3xl font-bold tracking-tight text-slate-900 md:text-4xl"
             >
               {outsideHeading.title}
@@ -290,272 +318,287 @@ export function CyberRiskCalculator({
 
       <Card className="w-full border border-slate-200 bg-white shadow-lg shadow-slate-200/50 ring-0 [--card-spacing:--spacing(5)] md:[--card-spacing:--spacing(7)]">
         <CardContent className="px-(--card-spacing)">
-        <p aria-live="polite" className="sr-only">
-          {announcement}
-        </p>
+          <p aria-live="polite" className="sr-only">
+            {announcement}
+          </p>
 
-        <AnimatePresence mode="wait" initial={false}>
-          {step === "idle" && (
-            <motion.div key="idle" {...motionProps} className="flex flex-col gap-10 md:gap-12">
-              <PanelHeading autoFocus={hasNavigated} className="sr-only">
-                Kwestionariusz ryzyka — trzy pytania
-              </PanelHeading>
-              {QUESTIONS.map((question, index) => (
-                <motion.fieldset
-                  key={question.key}
-                  animate={shakeControls[question.key]}
-                  className="flex flex-col border-0 p-0"
-                >
-                  <legend className="mb-4 flex w-full items-center gap-2.5">
-                    <span
-                      className={cn(
-                        "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors duration-200",
-                        answers[question.key]
-                          ? "bg-blue-600 text-white"
-                          : "bg-slate-100 text-slate-600"
-                      )}
-                      aria-hidden="true"
+          <PanelStage reducedMotion={Boolean(prefersReducedMotion)}>
+            <AnimatePresence mode="popLayout" initial={false}>
+              {step === "idle" && (
+                <motion.div key="idle" {...motionProps} className="flex flex-col gap-10 md:gap-12">
+                  <PanelHeading autoFocus={hasNavigated} className="sr-only">
+                    Kwestionariusz ryzyka — trzy pytania
+                  </PanelHeading>
+                  {QUESTIONS.map((question, index) => (
+                    <motion.fieldset
+                      key={question.key}
+                      animate={shakeControls[question.key]}
+                      className="flex flex-col border-0 p-0"
                     >
-                      {index + 1}
-                    </span>
-                    <span className="text-lg font-semibold tracking-tight text-slate-900 md:text-xl">
-                      {question.title}
-                    </span>
-                    <HintPopover
-                      title={question.title}
-                      hint={question.hint}
-                      explanation={question.explanation}
-                    />
-                  </legend>
+                      <legend className="mb-4 flex w-full items-center gap-2.5">
+                        <span
+                          className={cn(
+                            "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors duration-200",
+                            answers[question.key]
+                              ? "bg-blue-600 text-white"
+                              : "bg-slate-100 text-slate-600"
+                          )}
+                          aria-hidden="true"
+                        >
+                          {index + 1}
+                        </span>
+                        <span className="text-lg font-semibold tracking-tight text-slate-900 md:text-xl">
+                          {question.title}
+                        </span>
+                        <HintPopover
+                          title={question.title}
+                          hint={question.hint}
+                          explanation={question.explanation}
+                        />
+                      </legend>
 
-                  {question.key === "industry" && (
-                    <TileGroup
-                      name="Branża"
-                      options={INDUSTRIES}
-                      value={answers.industry}
-                      invalid={missing.includes("industry")}
-                      errorId="calculate-error"
-                      onSelect={(id) => select("industry", id)}
-                      className="grid grid-cols-1 gap-2.5 sm:grid-cols-2"
-                      reducedMotion={Boolean(prefersReducedMotion)}
-                    />
-                  )}
-                  {question.key === "size" && (
-                    <TileGroup
-                      name="Liczba pracowników"
-                      options={COMPANY_SIZES}
-                      value={answers.size}
-                      invalid={missing.includes("size")}
-                      errorId="calculate-error"
-                      onSelect={(id) => select("size", id)}
-                      className="grid grid-cols-2 gap-2.5 sm:grid-cols-4"
-                      compact
-                      reducedMotion={Boolean(prefersReducedMotion)}
-                    />
-                  )}
-                  {question.key === "remote" && (
-                    <TileGroup
-                      name="Tryb pracy"
-                      options={REMOTE_MODES}
-                      value={answers.remote}
-                      invalid={missing.includes("remote")}
-                      errorId="calculate-error"
-                      onSelect={(id) => select("remote", id)}
-                      className="grid grid-cols-1 gap-2.5 sm:grid-cols-3"
-                      reducedMotion={Boolean(prefersReducedMotion)}
-                    />
-                  )}
-                </motion.fieldset>
-              ))}
+                      {question.key === "industry" && (
+                        <TileGroup
+                          name="Branża"
+                          options={INDUSTRIES}
+                          value={answers.industry}
+                          invalid={missing.includes("industry")}
+                          errorId="calculate-error"
+                          onSelect={(id) => select("industry", id)}
+                          className="grid grid-cols-1 gap-2.5 sm:grid-cols-2"
+                          reducedMotion={Boolean(prefersReducedMotion)}
+                        />
+                      )}
+                      {question.key === "size" && (
+                        <TileGroup
+                          name="Liczba pracowników"
+                          options={COMPANY_SIZES}
+                          value={answers.size}
+                          invalid={missing.includes("size")}
+                          errorId="calculate-error"
+                          onSelect={(id) => select("size", id)}
+                          className="grid grid-cols-2 gap-2.5 sm:grid-cols-4"
+                          compact
+                          reducedMotion={Boolean(prefersReducedMotion)}
+                        />
+                      )}
+                      {question.key === "remote" && (
+                        <TileGroup
+                          name="Tryb pracy"
+                          options={REMOTE_MODES}
+                          value={answers.remote}
+                          invalid={missing.includes("remote")}
+                          errorId="calculate-error"
+                          onSelect={(id) => select("remote", id)}
+                          className="grid grid-cols-1 gap-2.5 sm:grid-cols-3"
+                          reducedMotion={Boolean(prefersReducedMotion)}
+                        />
+                      )}
+                    </motion.fieldset>
+                  ))}
 
-              <div className="flex flex-col gap-3 border-t border-slate-100 pt-5">
-                {missing.length > 0 && (
-                  <p id="calculate-error" className="flex items-start gap-2 text-sm text-rose-600">
-                    <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                    <span>
-                      Uzupełnij, aby kontynuować:{" "}
-                      {QUESTIONS.filter((question) => missing.includes(question.key))
-                        .map((question) => question.title)
-                        .join(", ")}
-                      .
-                    </span>
-                  </p>
-                )}
+                  <div className="flex flex-col gap-3 border-t border-slate-100 pt-5">
+                    {missing.length > 0 && (
+                      <p id="calculate-error" className="flex items-start gap-2 text-sm text-rose-600">
+                        <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                        <span>
+                          Uzupełnij, aby kontynuować:{" "}
+                          {QUESTIONS.filter((question) => missing.includes(question.key))
+                            .map((question) => question.title)
+                            .join(", ")}
+                          .
+                        </span>
+                      </p>
+                    )}
 
-                <motion.div whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}>
-                  {/*
-                   * Deliberately NOT disabled: PRD §4 requires a shake + error when
-                   * an incomplete form is submitted, which a disabled button can
-                   * never trigger. It is muted until complete, but stays operable
-                   * for both pointer and keyboard users.
-                   */}
+                    {/*
+                     * tabIndex={-1} is load-bearing: framer-motion makes any
+                     * whileTap element focusable unless it already carries a
+                     * tabindex, which would put a nameless tab stop in front of
+                     * the very button this wrapper exists to animate.
+                     */}
+                    <motion.div
+                      tabIndex={-1}
+                      whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}
+                    >
+                      {/*
+                       * Deliberately NOT disabled: PRD §4 requires a shake + error when
+                       * an incomplete form is submitted, which a disabled button can
+                       * never trigger. It is muted until complete, but stays operable
+                       * for both pointer and keyboard users.
+                       */}
+                      <Button
+                        type="button"
+                        onClick={handleCalculate}
+                        aria-invalid={missing.length > 0}
+                        aria-describedby={
+                          missing.length > 0 ? "calculate-error" : "calculate-hint"
+                        }
+                        className={cn(
+                          PRIMARY_CTA,
+                          isComplete(answers)
+                            ? "bg-blue-600 text-white hover:bg-blue-700"
+                            : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                        )}
+                      >
+                        Oblicz moje ryzyko
+                        <ArrowRight className="size-5" aria-hidden="true" />
+                      </Button>
+                    </motion.div>
+
+                    <p id="calculate-hint" className="text-center text-xs text-slate-600">
+                      {isComplete(answers)
+                        ? "Wynik otrzymasz od razu — bez podawania danych kontaktowych."
+                        : "Odpowiedz na wszystkie trzy pytania, aby poznać wynik."}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+
+              {step === "calculating" && (
+                <motion.div
+                  key="calculating"
+                  {...motionProps}
+                  className="flex min-h-[22rem] flex-col items-center justify-center gap-6 py-6 text-center"
+                >
+                  <PanelHeading autoFocus={hasNavigated} className="sr-only">
+                    Trwa analiza Twoich odpowiedzi
+                  </PanelHeading>
+                  <ProcessingView
+                    reducedMotion={Boolean(prefersReducedMotion)}
+                    onAnnounce={announce}
+                  />
+                </motion.div>
+              )}
+
+              {step === "result" && result && (
+                <motion.div key="result" {...motionProps}>
+                  <ResultView
+                    result={result}
+                    answers={answers}
+                    reducedMotion={Boolean(prefersReducedMotion)}
+                    onSecure={() => {
+                      goToStep("lead")
+                      setAnnouncement("Zostaw kontakt, aby otrzymać ofertę.")
+                    }}
+                    onReset={reset}
+                  />
+                </motion.div>
+              )}
+
+              {step === "lead" && result && (
+                <motion.div key="lead" {...motionProps} className="flex flex-col">
+                  <form className="flex flex-col gap-4" onSubmit={handleLeadSubmit} noValidate>
+                    <Field
+                      id="lead-email"
+                      label="Służbowy e-mail"
+                      type="email"
+                      placeholder="jan.kowalski@firma.pl"
+                      autoComplete="email"
+                      value={lead.email}
+                      error={leadErrors.email}
+                      onChange={(value) => {
+                        setLead((current) => ({ ...current, email: value }))
+                        setLeadErrors((current) => ({ ...current, email: undefined }))
+                      }}
+                    />
+                    <Field
+                      id="lead-company"
+                      label="Nazwa firmy"
+                      type="text"
+                      placeholder="Firma Sp. z o.o."
+                      autoComplete="organization"
+                      value={lead.company}
+                      error={leadErrors.company}
+                      onChange={(value) => {
+                        setLead((current) => ({ ...current, company: value }))
+                        setLeadErrors((current) => ({ ...current, company: undefined }))
+                      }}
+                    />
+                    <Field
+                      id="lead-phone"
+                      label="Telefon"
+                      optionalLabel="opcjonalnie"
+                      type="tel"
+                      placeholder="+48 600 000 000"
+                      autoComplete="tel"
+                      value={lead.phone}
+                      error={leadErrors.phone}
+                      onChange={(value) => setLead((current) => ({ ...current, phone: value }))}
+                    />
+
+                    <div className="flex flex-col gap-3 pt-1">
+                      {/* tabIndex={-1}: see the note on the calculate button. */}
+                      <motion.div
+                        tabIndex={-1}
+                        whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}
+                      >
+                        <Button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className={cn(PRIMARY_CTA, "bg-blue-600 text-white hover:bg-blue-700")}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+                              Wysyłam…
+                            </>
+                          ) : (
+                            "Wyślij zapytanie o ofertę"
+                          )}
+                        </Button>
+                      </motion.div>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => goToStep("result")}
+                        className="h-10 w-full cursor-pointer text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      >
+                        Wróć do wyniku
+                      </Button>
+                    </div>
+
+                    <p className="flex items-start gap-2 text-xs leading-relaxed text-slate-600">
+                      <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                      Twoje dane wykorzystamy wyłącznie do przygotowania oferty. Nie przekazujemy ich
+                      podmiotom trzecim.
+                    </p>
+                  </form>
+                </motion.div>
+              )}
+
+              {step === "submitted" && (
+                <motion.div
+                  key="submitted"
+                  {...motionProps}
+                  className="flex flex-col items-center justify-center gap-6 py-8 text-center"
+                >
+                  <motion.span
+                    initial={prefersReducedMotion ? undefined : { opacity: 0 }}
+                    animate={prefersReducedMotion ? undefined : { opacity: 1 }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    className="flex size-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200"
+                  >
+                    <CheckCircle2 className="size-8" aria-hidden="true" />
+                  </motion.span>
+
                   <Button
                     type="button"
-                    onClick={handleCalculate}
-                    aria-invalid={missing.length > 0}
-                    aria-describedby={
-                      missing.length > 0 ? "calculate-error" : "calculate-hint"
-                    }
+                    variant="outline"
+                    onClick={reset}
                     className={cn(
                       PRIMARY_CTA,
-                      isComplete(answers)
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                      "mt-2 max-w-sm border-slate-200 text-slate-700 hover:bg-slate-50"
                     )}
                   >
-                    Oblicz moje ryzyko
-                    <ArrowRight className="size-5" aria-hidden="true" />
+                    <RotateCcw className="size-5" aria-hidden="true" />
+                    Policz ryzyko jeszcze raz
                   </Button>
                 </motion.div>
-
-                <p id="calculate-hint" className="text-center text-xs text-slate-600">
-                  {isComplete(answers)
-                    ? "Wynik otrzymasz od razu — bez podawania danych kontaktowych."
-                    : "Odpowiedz na wszystkie trzy pytania, aby poznać wynik."}
-                </p>
-              </div>
-            </motion.div>
-          )}
-
-          {step === "calculating" && (
-            <motion.div
-              key="calculating"
-              {...motionProps}
-              className="flex min-h-[22rem] flex-col items-center justify-center gap-6 py-6 text-center"
-            >
-              <PanelHeading autoFocus={hasNavigated} className="sr-only">
-                Trwa analiza Twoich odpowiedzi
-              </PanelHeading>
-              <ProcessingView
-                reducedMotion={Boolean(prefersReducedMotion)}
-                onAnnounce={announce}
-              />
-            </motion.div>
-          )}
-
-          {step === "result" && result && (
-            <motion.div key="result" {...motionProps}>
-              <ResultView
-                result={result}
-                answers={answers}
-                reducedMotion={Boolean(prefersReducedMotion)}
-                onSecure={() => {
-                  goToStep("lead")
-                  setAnnouncement("Zostaw kontakt, aby otrzymać ofertę.")
-                }}
-                onReset={reset}
-              />
-            </motion.div>
-          )}
-
-          {step === "lead" && result && (
-            <motion.div key="lead" {...motionProps} className="flex flex-col">
-              <form className="flex flex-col gap-4" onSubmit={handleLeadSubmit} noValidate>
-                <Field
-                  id="lead-email"
-                  label="Służbowy e-mail"
-                  type="email"
-                  placeholder="jan.kowalski@firma.pl"
-                  autoComplete="email"
-                  value={lead.email}
-                  error={leadErrors.email}
-                  onChange={(value) => {
-                    setLead((current) => ({ ...current, email: value }))
-                    setLeadErrors((current) => ({ ...current, email: undefined }))
-                  }}
-                />
-                <Field
-                  id="lead-company"
-                  label="Nazwa firmy"
-                  type="text"
-                  placeholder="Firma Sp. z o.o."
-                  autoComplete="organization"
-                  value={lead.company}
-                  error={leadErrors.company}
-                  onChange={(value) => {
-                    setLead((current) => ({ ...current, company: value }))
-                    setLeadErrors((current) => ({ ...current, company: undefined }))
-                  }}
-                />
-                <Field
-                  id="lead-phone"
-                  label="Telefon"
-                  optionalLabel="opcjonalnie"
-                  type="tel"
-                  placeholder="+48 600 000 000"
-                  autoComplete="tel"
-                  value={lead.phone}
-                  error={leadErrors.phone}
-                  onChange={(value) => setLead((current) => ({ ...current, phone: value }))}
-                />
-
-                <div className="flex flex-col gap-3 pt-1">
-                  <motion.div whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}>
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className={cn(PRIMARY_CTA, "bg-blue-600 text-white hover:bg-blue-700")}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="size-5 animate-spin" aria-hidden="true" />
-                          Wysyłam…
-                        </>
-                      ) : (
-                        "Wyślij zapytanie o ofertę"
-                      )}
-                    </Button>
-                  </motion.div>
-
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => goToStep("result")}
-                    className="h-10 w-full cursor-pointer text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  >
-                    Wróć do wyniku
-                  </Button>
-                </div>
-
-                <p className="flex items-start gap-2 text-xs leading-relaxed text-slate-600">
-                  <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                  Twoje dane wykorzystamy wyłącznie do przygotowania oferty. Nie przekazujemy ich
-                  podmiotom trzecim.
-                </p>
-              </form>
-            </motion.div>
-          )}
-
-          {step === "submitted" && (
-            <motion.div
-              key="submitted"
-              {...motionProps}
-              className="flex flex-col items-center justify-center gap-6 py-8 text-center"
-            >
-              <motion.span
-                initial={prefersReducedMotion ? undefined : { scale: 0.8, opacity: 0 }}
-                animate={prefersReducedMotion ? undefined : { scale: 1, opacity: 1 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
-                className="flex size-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200"
-              >
-                <CheckCircle2 className="size-8" aria-hidden="true" />
-              </motion.span>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={reset}
-                className={cn(
-                  PRIMARY_CTA,
-                  "mt-2 max-w-sm border-slate-200 text-slate-700 hover:bg-slate-50"
-                )}
-              >
-                <RotateCcw className="size-5" aria-hidden="true" />
-                Policz ryzyko jeszcze raz
-              </Button>
-            </motion.div>
-          )}
-          </AnimatePresence>
+              )}
+            </AnimatePresence>
+          </PanelStage>
         </CardContent>
       </Card>
     </div>

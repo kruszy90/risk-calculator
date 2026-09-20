@@ -4,6 +4,7 @@ import * as React from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ShieldCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { EASE_OUT } from "@/lib/motion"
 import { Progress } from "@/components/ui/progress"
 import { PROCESSING_DURATION_MS, PROCESSING_STEPS } from "@/lib/risk-engine"
 
@@ -77,10 +78,10 @@ export function ProcessingView({
           <AnimatePresence mode="wait">
             <motion.p
               key={messageIndex}
-              initial={reducedMotion ? undefined : { opacity: 0, y: 6 }}
-              animate={reducedMotion ? undefined : { opacity: 1, y: 0 }}
-              exit={reducedMotion ? undefined : { opacity: 0, y: -6 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
+              initial={reducedMotion ? undefined : { opacity: 0 }}
+              animate={reducedMotion ? undefined : { opacity: 1 }}
+              exit={reducedMotion ? undefined : { opacity: 0 }}
+              transition={{ duration: 0.25, ease: EASE_OUT }}
               className="text-sm font-medium text-slate-900"
             >
               {PROCESSING_STEPS[messageIndex]}

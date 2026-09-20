@@ -3,6 +3,7 @@
 import { motion } from "framer-motion"
 import { RotateCcw, ShieldCheck, TrendingUp, TriangleAlert } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { EASE_OUT } from "@/lib/motion"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -119,9 +120,10 @@ export function ResultView({
               return (
                 <motion.li
                   key={factor.key}
-                  initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, ease: "easeOut", delay: 0.2 + index * 0.1 }}
+                  initial={reducedMotion ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  /* Lands just behind the panel it sits in, not a beat later. */
+                  transition={{ duration: 0.28, ease: EASE_OUT, delay: 0.3 + index * 0.07 }}
                   className="flex items-start gap-3.5 p-4"
                 >
                   <span
@@ -192,8 +194,14 @@ export function ResultView({
             </>
           )}
 
+          {/*
+           * tabIndex={-1}: framer-motion makes a whileTap element focusable
+           * unless it already carries a tabindex, which would add a nameless
+           * tab stop in front of the CTA this wrapper only exists to animate.
+           */}
           <motion.div
             className="relative"
+            tabIndex={-1}
             whileHover={reducedMotion ? undefined : { scale: 1.03 }}
             whileTap={reducedMotion ? undefined : { scale: 0.98 }}
             transition={{ type: "spring", stiffness: 400, damping: 28 }}

@@ -8,7 +8,13 @@ import { CalculatorLanding } from "@/components/calculator-landing";
  */
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-1 flex-col items-center justify-center gap-8 bg-slate-50 px-4 py-10 md:px-6 md:py-16">
+    /*
+     * overflow-anchor:none — the card changes height on every step, and the
+     * browser's scroll anchoring reacts by shifting the scroll position to keep
+     * the old content in place. That fights the transition, so the page visibly
+     * bounces. The calculator takes the user to the top itself instead.
+     */
+    <div className="flex min-h-screen flex-1 flex-col items-center justify-center gap-8 bg-slate-50 px-4 py-10 [overflow-anchor:none] md:px-6 md:py-16">
       <CalculatorLanding
         intro={
           <>
