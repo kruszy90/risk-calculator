@@ -1,8 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
-import { CyberRiskCalculator, type Step } from "@/components/cyber-risk-calculator"
+import { AnimatePresence } from "framer-motion"
+import { CollapsibleReveal } from "@/components/collapsible-reveal"
+import { CyberRiskCalculator, type Step } from "@/components/risk-calculator"
 
 /**
  * Owns just enough calculator state to decide whether the page intro is shown.
@@ -17,29 +18,31 @@ export function CalculatorLanding({
   trust: React.ReactNode
 }) {
   const [step, setStep] = React.useState<Step>("idle")
-  const prefersReducedMotion = useReducedMotion()
 
-  // Once there is a result on screen, the marketing intro just pushes it down.
-  const showIntro = step === "idle" || step === "calculating"
+  // The intro belongs to the questionnaire only — during analysis and after it,
+  // it just pushes the thing the user is waiting for further down the page.
+  const showIntro = step === "idle"
 
   return (
     <>
       <AnimatePresence initial={false}>
         {showIntro && (
-          <motion.header
+          <CollapsibleReveal
             key="intro"
-            className="flex w-full max-w-2xl flex-col items-center gap-4 overflow-hidden text-center"
-            initial={prefersReducedMotion ? false : { opacity: 0, height: 0 }}
-            animate={
-              prefersReducedMotion ? { opacity: 1 } : { opacity: 1, height: "auto" }
-            }
-            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
+            as="header"
+            className="flex w-full max-w-2xl flex-col items-center gap-4 text-center"
           >
             {intro}
-          </motion.header>
+          </CollapsibleReveal>
         )}
       </AnimatePresence>
+
+      {/*
+       * The visible h1 lives in the intro, which is hidden from the analysis
+       * step onwards. Keep a screen-reader-only one so the document never ends
+       * up without a top-level heading.
+       */}
+      {!showIntro && <h1 className="sr-only">Kalkulator cyberryzyka</h1>}
 
       <main className="w-full max-w-2xl">
         <CyberRiskCalculator onStepChange={setStep} />

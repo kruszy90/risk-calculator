@@ -87,11 +87,38 @@ export const EMPTY_ANSWERS: Answers = { industry: null, size: null, remote: null
 
 export type AnswerKey = keyof Answers
 
-/** Question metadata, used to render the form and to name missing answers in errors. */
-export const QUESTIONS: { key: AnswerKey; title: string; hint: string }[] = [
-  { key: "industry", title: "Branża", hint: "W czym działa Twoja firma?" },
-  { key: "size", title: "Liczba pracowników", hint: "Ilu masz pracowników?" },
-  { key: "remote", title: "Tryb pracy", hint: "Jak pracuje Twój zespół?" },
+/**
+ * Question metadata, used to render the form and to name missing answers in
+ * errors. `hint` is the short prompt; `explanation` is the "why we ask" text
+ * behind the ? affordance.
+ */
+export const QUESTIONS: {
+  key: AnswerKey
+  title: string
+  hint: string
+  explanation: string
+}[] = [
+  {
+    key: "industry",
+    title: "Branża",
+    hint: "W czym działa Twoja firma?",
+    explanation:
+      "Branża decyduje o tym, jakie dane przechowujesz i kto Cię atakuje. Firmy technologiczne i finansowe są celem ataków ukierunkowanych na płatności, a placówki medyczne odpowiadają dodatkowo przed RODO. Jedno i drugie wyraźnie podnosi koszt pojedynczego incydentu.",
+  },
+  {
+    key: "size",
+    title: "Liczba pracowników",
+    hint: "Ilu masz pracowników?",
+    explanation:
+      "Każdy pracownik to kolejne konta, urządzenia i skrzynki pocztowe — czyli kolejne drzwi do Twojej sieci. Im większy zespół, tym większa powierzchnia ataku i tym dłużej trwa wykrycie oraz opanowanie incydentu.",
+  },
+  {
+    key: "remote",
+    title: "Tryb pracy",
+    hint: "Jak pracuje Twój zespół?",
+    explanation:
+      "Praca poza biurem wynosi firmowe dane poza kontrolowaną sieć. Domowe routery, prywatne Wi-Fi i urządzenia bez nadzoru działu IT to dziś najczęstszy wektor wejścia do organizacji — dlatego model pracy tak mocno waży na wyniku.",
+  },
 ]
 
 type TierDefinition = {
@@ -109,7 +136,7 @@ const TIERS: TierDefinition[] = [
     tier: "LOW",
     label: "Niskie ryzyko",
     summary:
-      "Twój profil jest stosunkowo odporny, ale pojedynczy incydent nadal potrafi zatrzymać działalność na kilka dni.",
+      "Twój profil jest odporny, ale jeden incydent zatrzyma firmę na kilka dni.",
     min: 15_000,
     max: 50_000,
     openEnded: false,
@@ -118,7 +145,7 @@ const TIERS: TierDefinition[] = [
     tier: "MEDIUM",
     label: "Średnie ryzyko",
     summary:
-      "Twoja firma ma realną ekspozycję na ransomware i wyłudzenia. Koszt jednego incydentu przewyższa roczną składkę wielokrotnie.",
+      "Masz realną ekspozycję na ransomware i wyłudzenia płatności.",
     min: 50_000,
     max: 250_000,
     openEnded: false,
@@ -127,7 +154,7 @@ const TIERS: TierDefinition[] = [
     tier: "HIGH",
     label: "Wysokie ryzyko",
     summary:
-      "Profil wysokiego ryzyka. Skala danych i rozproszenie zespołu sprawiają, że jesteś atrakcyjnym celem dla zorganizowanych grup.",
+      "Jesteś atrakcyjnym celem dla zorganizowanych grup przestępczych.",
     min: 250_000,
     max: 1_500_000,
     openEnded: true,
@@ -144,7 +171,7 @@ export type RiskResult = {
   openEnded: boolean
   /** The figure the animated counter drives towards. */
   headline: number
-  factors: string[]
+  factors: RiskFactor[]
 }
 
 /** Type guard: every question answered. */
@@ -167,12 +194,26 @@ function optionFor<TId extends string>(options: Option<TId>[], id: TId): Option<
   return option
 }
 
-/** Personalised bullet points shown under the result. */
+/**
+ * A driver of the score: which answer caused it, and why it matters. Carrying
+ * the answer's own label and icon lets the result tie each line back to what
+ * the user actually picked.
+ */
+export type RiskFactor = {
+  key: AnswerKey
+  label: string
+  detail: string
+  icon: LucideIcon
+  /** Points this answer contributed, shown as the weight of the driver. */
+  points: number
+}
+
+/** Personalised drivers shown under the result. */
 function buildFactors(answers: {
   industry: IndustryId
   size: CompanySizeId
   remote: RemoteModeId
-}): string[] {
+}): RiskFactor[] {
   const industryFactors: Record<IndustryId, string> = {
     "tech-finance":
       "Branża technologiczna i finansowa jest celem numer jeden dla ataków ukierunkowanych na dane i płatności.",
@@ -204,10 +245,32 @@ function buildFactors(answers: {
       "Praca wyłącznie z biura ogranicza ekspozycję, ale nie chroni przed phishingiem ani atakiem na pocztę firmową.",
   }
 
+  const industry = optionFor(INDUSTRIES, answers.industry)
+  const size = optionFor(COMPANY_SIZES, answers.size)
+  const remote = optionFor(REMOTE_MODES, answers.remote)
+
   return [
-    industryFactors[answers.industry],
-    sizeFactors[answers.size],
-    remoteFactors[answers.remote],
+    {
+      key: "industry",
+      label: industry.label,
+      detail: industryFactors[answers.industry],
+      icon: industry.icon,
+      points: industry.points,
+    },
+    {
+      key: "size",
+      label: `${size.label} pracowników`,
+      detail: sizeFactors[answers.size],
+      icon: size.icon,
+      points: size.points,
+    },
+    {
+      key: "remote",
+      label: remote.label,
+      detail: remoteFactors[answers.remote],
+      icon: remote.icon,
+      points: remote.points,
+    },
   ]
 }
 
@@ -264,41 +327,47 @@ export function formatCurrency(value: number): string {
   return `${CURRENCY_SYMBOL}${amountFormatter.format(Math.round(value))}`
 }
 
+/** Score bounds: industry(1–3) + size(1–4) + remote(0–3). */
+export const MIN_SCORE = 2
+export const MAX_SCORE = 10
+
+/** Low → high, for labelling the risk scale. */
+export const TIER_ORDER: RiskTier[] = ["LOW", "MEDIUM", "HIGH"]
+
+/** Short labels for the scale beneath the figure. */
+export const TIER_LABELS: Record<RiskTier, string> = {
+  LOW: "Niskie",
+  MEDIUM: "Średnie",
+  HIGH: "Wysokie",
+}
+
 /** Light-theme colour sets per risk tier (docs/PROJECT_SPEC.md §3). */
 export const RISK_STYLES: Record<
   RiskTier,
   {
     text: string
     bg: string
-    border: string
     badge: string
     bar: string
-    glow: string
   }
 > = {
   LOW: {
     text: "text-emerald-700",
     bg: "bg-emerald-50",
-    border: "border-emerald-200",
     badge: "bg-emerald-100 text-emerald-800 border-emerald-200",
     bar: "bg-emerald-500",
-    glow: "shadow-emerald-100",
   },
   MEDIUM: {
     text: "text-amber-700",
     bg: "bg-amber-50",
-    border: "border-amber-200",
     badge: "bg-amber-100 text-amber-800 border-amber-200",
     bar: "bg-amber-500",
-    glow: "shadow-amber-100",
   },
   HIGH: {
     text: "text-rose-700",
     bg: "bg-rose-50",
-    border: "border-rose-200",
     badge: "bg-rose-100 text-rose-800 border-rose-200",
     bar: "bg-rose-500",
-    glow: "shadow-rose-100",
   },
 }
 

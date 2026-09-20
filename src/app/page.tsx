@@ -21,9 +21,8 @@ export default function Home() {
               Ile kosztuje Cię brak ochrony przed cyberatakiem?
             </h1>
 
-            <p className="max-w-lg text-sm leading-relaxed text-pretty text-slate-600 md:text-base">
-              Odpowiedz na trzy pytania i poznaj szacowany koszt jednego incydentu w Twojej
-              firmie.
+            <p className="text-sm leading-relaxed text-pretty text-slate-600 md:text-base">
+              Odpowiedz na trzy pytania i poznaj szacowany koszt incydentu w Twojej firmie.
             </p>
           </>
         }
@@ -31,20 +30,20 @@ export default function Home() {
           <>
             <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-slate-600">
               <li className="flex items-center gap-1.5">
-                <Lock className="size-3.5 text-slate-500" aria-hidden="true" />
+                <Lock className="size-3.5 text-slate-600" aria-hidden="true" />
                 Zgodność z RODO
               </li>
               <li className="flex items-center gap-1.5">
-                <Zap className="size-3.5 text-slate-500" aria-hidden="true" />
+                <Zap className="size-3.5 text-slate-600" aria-hidden="true" />
                 Wynik w 60 sekund
               </li>
               <li className="flex items-center gap-1.5">
-                <ShieldCheck className="size-3.5 text-slate-500" aria-hidden="true" />
+                <ShieldCheck className="size-3.5 text-slate-600" aria-hidden="true" />
                 Ponad 2 400 wykonanych audytów
               </li>
             </ul>
 
-            <p className="max-w-md text-center text-[11px] leading-relaxed text-slate-500">
+            <p className="max-w-md text-center text-[11px] leading-relaxed text-slate-600">
               Szacunki mają charakter poglądowy i opierają się na publicznych danych o kosztach
               incydentów. Ostateczna wycena ochrony wymaga indywidualnej analizy.
             </p>
