@@ -33,3 +33,8 @@ You are the Builder. Your responsibility is to translate the PRD and PROJECT_SPE
 - No yapping. Do not explain the code step-by-step.
 - No placeholders (`// TODO`).
 - Write complete, robust TypeScript code and save it directly to the appropriate files in the project structure.
+
+## 5. Mobile-First & Responsiveness
+- ALWAYS code mobile-first. Use default Tailwind classes for mobile layouts (e.g., `flex-col`, `p-4`, `text-base`) and apply `md:` prefixes ONLY for desktop adjustments.
+- Ensure the layout never exceeds `100vw` (no horizontal scrolling).
+- Mobile touch targets (clickable tiles and buttons) must be at least `min-h-[3rem]` for accessibility.
