@@ -27,7 +27,8 @@ export type RiskTier = "LOW" | "MEDIUM" | "HIGH"
 export type Option<TId extends string> = {
   id: TId
   label: string
-  description: string
+  /** Optional: the work-mode tiles read clearly enough from their label alone. */
+  description?: string
   icon: LucideIcon
   points: number
 }
@@ -71,27 +72,9 @@ export const COMPANY_SIZES: Option<CompanySizeId>[] = [
 ]
 
 export const REMOTE_MODES: Option<RemoteModeId>[] = [
-  {
-    id: "remote",
-    label: "W pełni zdalna",
-    description: "Zespół pracuje z dowolnego miejsca",
-    icon: Globe,
-    points: 3,
-  },
-  {
-    id: "hybrid",
-    label: "Hybrydowa",
-    description: "Biuro i praca zdalna naprzemiennie",
-    icon: Laptop,
-    points: 2,
-  },
-  {
-    id: "office",
-    label: "Tylko biuro",
-    description: "Praca wyłącznie w siedzibie firmy",
-    icon: Briefcase,
-    points: 0,
-  },
+  { id: "remote", label: "W pełni zdalna", icon: Globe, points: 3 },
+  { id: "hybrid", label: "Hybrydowa", icon: Laptop, points: 2 },
+  { id: "office", label: "Tylko biuro", icon: Briefcase, points: 0 },
 ]
 
 export type Answers = {
@@ -110,13 +93,6 @@ export const QUESTIONS: { key: AnswerKey; title: string; hint: string }[] = [
   { key: "size", title: "Liczba pracowników", hint: "Ilu masz pracowników?" },
   { key: "remote", title: "Tryb pracy", hint: "Jak pracuje Twój zespół?" },
 ]
-
-/**
- * Currency used for the estimated-loss figures.
- * The PRD quotes USD amounts; switch this single constant (and the tier
- * amounts below) to bill the prototype in PLN instead.
- */
-export const CURRENCY = "USD"
 
 type TierDefinition = {
   tier: RiskTier
@@ -275,14 +251,17 @@ export function labelFor(key: AnswerKey, answers: Answers): string | null {
   return answers.remote ? optionFor(REMOTE_MODES, answers.remote).label : null
 }
 
-const currencyFormatter = new Intl.NumberFormat("pl-PL", {
-  style: "currency",
-  currency: CURRENCY,
-  maximumFractionDigits: 0,
-})
+/**
+ * Polish thousands grouping, with a leading symbol as the PRD writes its
+ * figures ("$250,000"). Swap the symbol and the tier amounts above together
+ * to price the prototype in another currency.
+ */
+const amountFormatter = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 0 })
+
+export const CURRENCY_SYMBOL = "$"
 
 export function formatCurrency(value: number): string {
-  return currencyFormatter.format(Math.round(value))
+  return `${CURRENCY_SYMBOL}${amountFormatter.format(Math.round(value))}`
 }
 
 /** Light-theme colour sets per risk tier (docs/PROJECT_SPEC.md §3). */
@@ -330,4 +309,8 @@ export const PROCESSING_STEPS = [
   "Generuję raport ryzyka…",
 ]
 
-export const PROCESSING_DURATION_MS = 1800
+/**
+ * Longer than the PRD's 1.5–2 s so each line of microcopy is actually readable
+ * (3 messages × 1.2 s). Still a deliberate delay, per PRD §2's labour illusion.
+ */
+export const PROCESSING_DURATION_MS = 3600

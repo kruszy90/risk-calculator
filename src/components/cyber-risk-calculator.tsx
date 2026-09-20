@@ -14,6 +14,7 @@ import {
   ArrowRight,
   BadgeCheck,
   CheckCircle2,
+  HelpCircle,
   Loader2,
   Lock,
   RotateCcw,
@@ -27,6 +28,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Progress } from "@/components/ui/progress"
 import {
   COMPANY_SIZES,
@@ -47,7 +49,7 @@ import {
   type RiskResult,
 } from "@/lib/risk-engine"
 
-type Step = "idle" | "calculating" | "result" | "lead" | "submitted"
+export type Step = "idle" | "calculating" | "result" | "lead" | "submitted"
 
 type LeadForm = { email: string; company: string; phone: string }
 type LeadErrors = Partial<Record<keyof LeadForm, string>>
@@ -58,7 +60,16 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/
 
 const stepTransition = { duration: 0.4, ease: "easeOut" as const }
 
-export function CyberRiskCalculator() {
+/** Every step's primary action shares this footprint. */
+const PRIMARY_CTA =
+  "h-14 w-full gap-2.5 rounded-xl text-lg font-semibold transition-colors duration-200"
+
+export function CyberRiskCalculator({
+  onStepChange,
+}: {
+  /** Lets the page chrome react to the step (it hides the intro after the result). */
+  onStepChange?: (step: Step) => void
+} = {}) {
   const prefersReducedMotion = useReducedMotion()
 
   const [step, setStep] = React.useState<Step>("idle")
@@ -194,6 +205,10 @@ export function CyberRiskCalculator() {
     return () => window.clearTimeout(timeout)
   }, [goToStep, isSubmitting])
 
+  React.useEffect(() => {
+    onStepChange?.(step)
+  }, [onStepChange, step])
+
   const motionProps = prefersReducedMotion
     ? {}
     : {
@@ -212,7 +227,7 @@ export function CyberRiskCalculator() {
 
         <AnimatePresence mode="wait" initial={false}>
           {step === "idle" && (
-            <motion.div key="idle" {...motionProps} className="flex flex-col gap-7">
+            <motion.div key="idle" {...motionProps} className="flex flex-col gap-10 md:gap-12">
               <PanelHeading autoFocus={hasNavigated} className="sr-only">
                 Kwestionariusz ryzyka — trzy pytania
               </PanelHeading>
@@ -220,24 +235,24 @@ export function CyberRiskCalculator() {
                 <motion.fieldset
                   key={question.key}
                   animate={shakeControls[question.key]}
-                  className="flex flex-col gap-3 border-0 p-0"
+                  className="flex flex-col border-0 p-0"
                 >
-                  <legend className="flex w-full flex-col gap-0.5">
-                    <span className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                      <span
-                        className={cn(
-                          "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
-                          answers[question.key]
-                            ? "bg-blue-600 text-white"
-                            : "bg-slate-100 text-slate-500"
-                        )}
-                        aria-hidden="true"
-                      >
-                        {index + 1}
-                      </span>
+                  <legend className="mb-4 flex w-full items-center gap-2.5">
+                    <span
+                      className={cn(
+                        "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors duration-200",
+                        answers[question.key]
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-100 text-slate-600"
+                      )}
+                      aria-hidden="true"
+                    >
+                      {index + 1}
+                    </span>
+                    <span className="text-lg font-semibold tracking-tight text-slate-900 md:text-xl">
                       {question.title}
                     </span>
-                    <span className="pl-7 text-xs text-slate-500">{question.hint}</span>
+                    <HintPopover title={question.title} hint={question.hint} />
                   </legend>
 
                   {question.key === "industry" && (
@@ -309,14 +324,14 @@ export function CyberRiskCalculator() {
                       missing.length > 0 ? "calculate-error" : "calculate-hint"
                     }
                     className={cn(
-                      "h-12 w-full gap-2 rounded-lg text-base font-semibold transition-all duration-200",
+                      PRIMARY_CTA,
                       isComplete(answers)
                         ? "bg-blue-600 text-white hover:bg-blue-700"
                         : "bg-slate-200 text-slate-600 hover:bg-slate-300"
                     )}
                   >
                     Oblicz moje ryzyko
-                    <ArrowRight className="size-4" aria-hidden="true" />
+                    <ArrowRight className="size-5" aria-hidden="true" />
                   </Button>
                 </motion.div>
 
@@ -336,7 +351,7 @@ export function CyberRiskCalculator() {
               className="flex min-h-[22rem] flex-col items-center justify-center gap-6 py-6 text-center"
             >
               <PanelHeading autoFocus={hasNavigated} className="sr-only">
-                Analizuję Twój profil ryzyka
+                Trwa analiza Twoich odpowiedzi
               </PanelHeading>
               <ProcessingView
                 reducedMotion={Boolean(prefersReducedMotion)}
@@ -423,17 +438,17 @@ export function CyberRiskCalculator() {
                     <Button
                       type="submit"
                       disabled={isSubmitting}
-                      className="h-12 w-full gap-2 rounded-lg bg-blue-600 text-base font-semibold text-white transition-all duration-200 hover:bg-blue-700"
+                      className={cn(PRIMARY_CTA, "bg-blue-600 text-white hover:bg-blue-700")}
                     >
                       {isSubmitting ? (
                         <>
-                          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                          <Loader2 className="size-5 animate-spin" aria-hidden="true" />
                           Wysyłam…
                         </>
                       ) : (
                         <>
                           Wyślij zapytanie o ofertę
-                          <ArrowRight className="size-4" aria-hidden="true" />
+                          <ArrowRight className="size-5" aria-hidden="true" />
                         </>
                       )}
                     </Button>
@@ -491,9 +506,12 @@ export function CyberRiskCalculator() {
                 type="button"
                 variant="outline"
                 onClick={reset}
-                className="mt-2 h-11 gap-2 rounded-lg border-slate-200 px-5 text-sm text-slate-700 hover:bg-slate-50"
+                className={cn(
+                  PRIMARY_CTA,
+                  "mt-2 max-w-sm border-slate-200 text-slate-700 hover:bg-slate-50"
+                )}
               >
-                <RotateCcw className="size-4" aria-hidden="true" />
+                <RotateCcw className="size-5" aria-hidden="true" />
                 Policz ryzyko jeszcze raz
               </Button>
             </motion.div>
@@ -501,6 +519,40 @@ export function CyberRiskCalculator() {
         </AnimatePresence>
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * The per-question hint, behind a "?" affordance. A Popover rather than a
+ * Tooltip because it opens on click — tooltips are hover/focus-only and never
+ * open on touch.
+ */
+function HintPopover({ title, hint }: { title: string; hint: string }) {
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            aria-label={`Więcej o pytaniu: ${title}`}
+            /*
+             * The circle stays 24px so it does not compete with the question
+             * title, but a centred pseudo-element gives it a 44px tap target.
+             */
+            className="relative flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors duration-200 outline-none before:absolute before:top-1/2 before:left-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 data-[popup-open]:border-blue-600 data-[popup-open]:bg-blue-50 data-[popup-open]:text-blue-700"
+          >
+            <HelpCircle className="size-3.5" aria-hidden="true" />
+          </button>
+        }
+      />
+      <PopoverContent
+        side="top"
+        sideOffset={8}
+        className="w-64 border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-700 shadow-lg ring-0"
+      >
+        {hint}
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -658,14 +710,16 @@ function TileGroup<TId extends string>({
               </span>
               {/* slate-600, not slate-500: on the selected tile's blue-50 the
                   lighter token measures 4.37:1 and fails AA. */}
-              <span
-                className={cn(
-                  "text-xs leading-snug text-slate-600",
-                  compact && "text-[11px]"
-                )}
-              >
-                {option.description}
-              </span>
+              {option.description && (
+                <span
+                  className={cn(
+                    "text-xs leading-snug text-slate-600",
+                    compact && "text-[11px]"
+                  )}
+                >
+                  {option.description}
+                </span>
+              )}
             </span>
           </motion.button>
         )
@@ -777,115 +831,165 @@ function ResultView({
   const scorePercent = Math.round(((result.score - 2) / 8) * 100)
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-7">
+      {/* 1. What this is, 2. the result, 3. what they told us, 4. why, 5. the CTA. */}
       <PanelHeading
         autoFocus={autoFocusHeading}
-        className="text-xl font-semibold tracking-tight text-slate-900"
+        className="text-center text-2xl font-bold tracking-tight text-slate-900 md:text-3xl"
       >
-        Twój wynik: {result.label.toLowerCase()}
+        Twój profil ryzyka
       </PanelHeading>
 
-      <div
-        className={cn(
-          "flex flex-col items-center gap-4 rounded-xl border p-6 text-center",
-          styles.bg,
-          styles.border
-        )}
-      >
-        <Badge
-          className={cn(
-            "h-auto gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide uppercase",
-            styles.badge
-          )}
-        >
-          <TrendingUp className="size-3" aria-hidden="true" />
-          {result.label}
-        </Badge>
+      {/* The tier colour is an accent — a strip, a badge and the figure — not a wash. */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className={cn("h-1.5 w-full", styles.bar)} aria-hidden="true" />
 
-        <div className="flex w-full flex-col gap-2">
-          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
-            Szacowany koszt jednego incydentu
-          </p>
-          <AnimatedAmount
-            value={result.headline}
-            openEnded={result.openEnded}
-            reducedMotion={reducedMotion}
-            className={cn("text-4xl font-bold tracking-tight tabular-nums md:text-5xl", styles.text)}
-          />
-          <p className="text-xs text-slate-500">
-            Widełki dla Twojego profilu: {formatCurrency(result.min)} –{" "}
-            {formatCurrency(result.max)}
-            {result.openEnded ? " i więcej" : ""}
-          </p>
-        </div>
+        <div className="flex flex-col items-center gap-5 p-6 text-center">
+          <Badge
+            className={cn(
+              "h-auto gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide uppercase",
+              styles.badge
+            )}
+          >
+            <TrendingUp className="size-3" aria-hidden="true" />
+            {result.label}
+          </Badge>
 
-        <div className="flex w-full flex-col gap-1.5">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/70">
-            <motion.div
-              className={cn("h-full rounded-full", styles.bar)}
-              initial={reducedMotion ? false : { width: 0 }}
-              animate={{ width: `${scorePercent}%` }}
-              transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
+          <div className="flex w-full flex-col gap-2">
+            <p className="text-xs font-medium tracking-wide text-slate-600 uppercase">
+              Szacowany koszt jednego incydentu
+            </p>
+            <AnimatedAmount
+              value={result.headline}
+              openEnded={result.openEnded}
+              reducedMotion={reducedMotion}
+              className={cn(
+                "text-4xl font-bold tracking-tight tabular-nums md:text-5xl",
+                styles.text
+              )}
             />
+            <p className="text-sm text-slate-600">
+              Widełki dla Twojego profilu: {formatCurrency(result.min)} –{" "}
+              {formatCurrency(result.max)}
+              {result.openEnded ? " i więcej" : ""}
+            </p>
           </div>
-          <div className="flex justify-between text-[11px] font-medium text-slate-500">
-            <span>Niskie</span>
-            <span>Średnie</span>
-            <span>Wysokie</span>
+
+          <div className="flex w-full flex-col gap-1.5">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <motion.div
+                className={cn("h-full rounded-full", styles.bar)}
+                initial={reducedMotion ? false : { width: 0 }}
+                animate={{ width: `${scorePercent}%` }}
+                transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
+              />
+            </div>
+            <div className="flex justify-between text-[11px] font-medium text-slate-600">
+              <span>Niskie</span>
+              <span>Średnie</span>
+              <span>Wysokie</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <p className="text-sm leading-relaxed text-slate-700">{result.summary}</p>
-
-        <ul className="flex flex-col gap-2.5">
-          {result.factors.map((factor, index) => (
-            <motion.li
-              key={factor}
-              initial={reducedMotion ? false : { opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, ease: "easeOut", delay: 0.25 + index * 0.1 }}
-              className="flex items-start gap-2.5 text-sm text-slate-600"
-            >
-              <BadgeCheck className="mt-0.5 size-4 shrink-0 text-blue-600" aria-hidden="true" />
-              <span>{factor}</span>
-            </motion.li>
-          ))}
-        </ul>
-      </div>
-
-      <dl className="grid grid-cols-1 gap-x-2 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-3 sm:text-center">
+      <dl className="grid grid-cols-1 gap-x-2 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-3 sm:text-center">
         {QUESTIONS.map((question) => (
           <div
             key={question.key}
-            className="flex items-baseline justify-between gap-3 sm:flex-col sm:items-center sm:gap-0.5"
+            className="flex items-baseline justify-between gap-3 sm:flex-col sm:items-center sm:gap-1"
           >
             <dt className="text-[11px] font-medium tracking-wide text-slate-600 uppercase">
               {question.title}
             </dt>
-            <dd className="text-right text-xs font-semibold text-slate-900 sm:text-center">
+            <dd className="text-right text-sm font-semibold text-slate-900 sm:text-center">
               {labelFor(question.key, answers)}
             </dd>
           </div>
         ))}
       </dl>
 
-      <div className="flex flex-col gap-3 border-t border-slate-100 pt-5">
-        <motion.div
-          whileHover={reducedMotion ? undefined : { scale: 1.02 }}
-          whileTap={reducedMotion ? undefined : { scale: 0.98 }}
-          transition={{ type: "spring", stiffness: 400, damping: 28 }}
-        >
-          <Button
-            type="button"
-            onClick={onSecure}
-            className="h-12 w-full gap-2 rounded-lg bg-blue-600 text-base font-semibold text-white shadow-md shadow-blue-600/20 transition-colors duration-200 hover:bg-blue-700"
+      <div className="flex flex-col gap-4">
+        <p className="text-base leading-relaxed text-slate-700">{result.summary}</p>
+
+        <ul className="flex flex-col gap-3.5">
+          {result.factors.map((factor, index) => (
+            <motion.li
+              key={factor}
+              initial={reducedMotion ? false : { opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut", delay: 0.25 + index * 0.1 }}
+              className="flex items-start gap-3 text-[15px] leading-relaxed text-slate-700"
+            >
+              <BadgeCheck
+                className="mt-0.5 size-4.5 shrink-0 text-blue-600"
+                aria-hidden="true"
+              />
+              <span>{factor}</span>
+            </motion.li>
+          ))}
+        </ul>
+      </div>
+
+      {/* gap-5 keeps the CTA's glow from bleeding onto the secondary action. */}
+      <div className="flex flex-col gap-5 border-t border-slate-100 pt-6">
+        {/*
+         * The pulse lives on a halo behind the button rather than on the button
+         * itself, so it cannot fight the hover/tap scale.
+         */}
+        <div className="relative isolate">
+          {/*
+           * The pulse lives entirely on these decorative layers. The button
+           * itself never moves: a click target that drifts is harder to hit,
+           * and it makes the control fail automated stability checks.
+           */}
+          {!reducedMotion && (
+            <>
+              {/*
+               * A sonar ring drawn with box-shadow spread rather than scale:
+               * it grows the same number of pixels on every edge, so a
+               * full-width button does not push it outside the card.
+               */}
+              <motion.span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 -z-10 rounded-xl"
+                animate={{
+                  boxShadow: [
+                    "0 0 0 0px rgba(37, 99, 235, 0.55)",
+                    "0 0 0 14px rgba(37, 99, 235, 0)",
+                  ],
+                }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
+              />
+              {/* A soft glow breathing underneath it. */}
+              <motion.span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 -z-10 rounded-xl bg-blue-500 blur-lg"
+                animate={{ opacity: [0.8, 0.3, 0.8] }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+              />
+            </>
+          )}
+
+          <motion.div
+            className="relative"
+            whileHover={reducedMotion ? undefined : { scale: 1.03 }}
+            whileTap={reducedMotion ? undefined : { scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 400, damping: 28 }}
           >
-            <ShieldCheck className="size-4" aria-hidden="true" />
-            Zabezpiecz się
-          </Button>
-        </motion.div>
+            <Button
+              type="button"
+              onClick={onSecure}
+              className={cn(
+                PRIMARY_CTA,
+                "bg-blue-600 text-white shadow-xl shadow-blue-600/35 hover:bg-blue-700"
+              )}
+            >
+              <ShieldCheck className="size-5" aria-hidden="true" />
+              Zabezpiecz się
+            </Button>
+          </motion.div>
+        </div>
 
         <Button
           type="button"
