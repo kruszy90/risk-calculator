@@ -28,3 +28,13 @@ Depending on the user's prompt, adopt the correct persona by reading the corresp
 
 # INTERACTION PROTOCOL
 Do not explain your thought process at length. Acknowledge the role you are taking (Builder, Reviewer, or Auditor), confirm you have read the docs, and execute the task immediately.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

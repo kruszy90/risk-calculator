@@ -25,7 +25,7 @@ You are the Builder. Your responsibility is to translate the PRD and PROJECT_SPE
 - The final financial loss counter MUST be animated (smoothly counting up from $0 to the final amount).
 
 ## 3. Styling & "The Vibe" (Tailwind CSS)
-- Implement modern design trends: use glassmorphism (e.g., `bg-white/5 backdrop-blur-lg border-white/10 dark:bg-black/40`), soft ambient shadows, and generous border radius (`rounded-2xl` or `rounded-3xl`).
+- Implement modern design trends: use glassmorphism, soft ambient shadows, and generous border radius (`rounded-2xl` or `rounded-3xl`).
 - Use `lucide-react` for iconography. Every clickable tile must have a relevant icon.
 - Use extreme visual contrast for the final Risk Level (e.g., deep glowing red for HIGH risk, amber for MID, emerald for LOW).
 
