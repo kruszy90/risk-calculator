@@ -325,7 +325,7 @@ export function CyberRiskCalculator({
           <PanelStage reducedMotion={Boolean(prefersReducedMotion)}>
             <AnimatePresence mode="popLayout" initial={false}>
               {step === "idle" && (
-                <motion.div key="idle" {...motionProps} className="flex flex-col gap-10 md:gap-12">
+                <motion.div key="idle" {...motionProps} className="flex flex-col gap-7 md:gap-8">
                   <PanelHeading autoFocus={hasNavigated} className="sr-only">
                     Kwestionariusz ryzyka — trzy pytania
                   </PanelHeading>
@@ -335,7 +335,7 @@ export function CyberRiskCalculator({
                       animate={shakeControls[question.key]}
                       className="flex flex-col border-0 p-0"
                     >
-                      <legend className="mb-4 flex w-full items-center gap-2.5">
+                      <legend className="mb-3 flex w-full items-center gap-2.5">
                         <span
                           className={cn(
                             "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors duration-200",
@@ -397,7 +397,9 @@ export function CyberRiskCalculator({
                     </motion.fieldset>
                   ))}
 
-                  <div className="flex flex-col gap-3 border-t border-slate-100 pt-5">
+                  {/* No rule above the CTA — the gap already separates it, and the
+                    line only pushed the button further down the page. */}
+                <div className="flex flex-col gap-3">
                     {missing.length > 0 && (
                       <p id="calculate-error" className="flex items-start gap-2 text-sm text-rose-600">
                         <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />

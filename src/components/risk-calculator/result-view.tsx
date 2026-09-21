@@ -38,6 +38,13 @@ export function ResultView({
   const styles = RISK_STYLES[result.tier]
 
   return (
+    /*
+     * One column, in the order that converts: the figure, then the ask, then the
+     * evidence behind the figure. The CTA used to sit at the very bottom, around
+     * 1000px down — below the fold on any laptop. Directly under the card it
+     * lands in the first screenful, and the detail stays available for anyone
+     * who wants to scroll for it.
+     */
     <div className="flex flex-col gap-7">
       {/* The tier colour is an accent — a strip, a badge and the figure — not a wash. */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -82,84 +89,11 @@ export function ResultView({
         </div>
       </div>
 
-      <dl className="grid grid-cols-1 gap-x-2 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-3 sm:text-center">
-        {QUESTIONS.map((question) => (
-          <div
-            key={question.key}
-            className="flex items-baseline justify-between gap-3 sm:flex-col sm:items-center sm:gap-1"
-          >
-            <dt className="text-[11px] font-medium tracking-wide text-slate-600 uppercase">
-              {question.title}
-            </dt>
-            <dd className="text-right text-sm font-semibold text-slate-900 sm:text-center">
-              {labelFor(question.key, answers)}
-            </dd>
-          </div>
-        ))}
-      </dl>
-
+      {/*
+       * The ask, straight after the figure — no rule between them, they belong
+       * together. gap-5 keeps the CTA's glow off the secondary action.
+       */}
       <div className="flex flex-col gap-5">
-        <p className="text-base leading-relaxed text-slate-700">{result.summary}</p>
-
-        <div className="flex flex-col gap-3">
-          <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-slate-900 uppercase">
-            <TriangleAlert
-              className={cn("size-4 shrink-0", styles.text)}
-              aria-hidden="true"
-            />
-            Co podnosi Twoje ryzyko
-          </h3>
-
-          {/*
-           * Each driver is tied to the answer that produced it and carries its
-           * weight. No check marks: these are warnings, not things done right.
-           */}
-          <ul className="flex flex-col divide-y divide-slate-100 rounded-xl border border-slate-200">
-            {result.factors.map((factor, index) => {
-              const Icon = factor.icon
-              return (
-                <motion.li
-                  key={factor.key}
-                  initial={reducedMotion ? false : { opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  /* Lands just behind the panel it sits in, not a beat later. */
-                  transition={{ duration: 0.28, ease: EASE_OUT, delay: 0.3 + index * 0.07 }}
-                  className="flex items-start gap-3.5 p-4"
-                >
-                  <span
-                    className={cn(
-                      "flex size-9 shrink-0 items-center justify-center rounded-lg",
-                      styles.bg,
-                      styles.text
-                    )}
-                    aria-hidden="true"
-                  >
-                    <Icon className="size-4.5" />
-                  </span>
-
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-slate-900">
-                      {factor.label}
-                      <span
-                        className={cn(
-                          "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide tabular-nums",
-                          styles.badge
-                        )}
-                      >
-                        +{factor.points} pkt
-                      </span>
-                    </p>
-                    <p className="text-sm leading-relaxed text-slate-600">{factor.detail}</p>
-                  </div>
-                </motion.li>
-              )
-            })}
-          </ul>
-        </div>
-      </div>
-
-      {/* gap-5 keeps the CTA's glow from bleeding onto the secondary action. */}
-      <div className="flex flex-col gap-5 border-t border-slate-100 pt-6">
         <div className="relative isolate">
           {/*
            * The pulse lives entirely on these decorative layers. The button
@@ -229,6 +163,86 @@ export function ResultView({
           <RotateCcw className="size-3.5" aria-hidden="true" />
           Policz ponownie
         </Button>
+      </div>
+
+      {/*
+       * The evidence behind the figure, below the ask. The rule marks the shift
+       * from "here is what it costs you" to "here is how we got there".
+       */}
+      <div className="flex flex-col gap-5 border-t border-slate-100 pt-7">
+        <dl className="grid grid-cols-1 gap-x-2 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-3 sm:text-center">
+          {QUESTIONS.map((question) => (
+            <div
+              key={question.key}
+              className="flex items-baseline justify-between gap-3 sm:flex-col sm:items-center sm:gap-1"
+            >
+              <dt className="text-[11px] font-medium tracking-wide text-slate-600 uppercase">
+                {question.title}
+              </dt>
+              <dd className="text-right text-sm font-semibold text-slate-900 sm:text-center">
+                {labelFor(question.key, answers)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <p className="text-base leading-relaxed text-slate-700">{result.summary}</p>
+
+        <div className="flex flex-col gap-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-slate-900 uppercase">
+            <TriangleAlert
+              className={cn("size-4 shrink-0", styles.text)}
+              aria-hidden="true"
+            />
+            Co podnosi Twoje ryzyko
+          </h3>
+
+          {/*
+           * Each driver is tied to the answer that produced it and carries its
+           * weight. No check marks: these are warnings, not things done right.
+           */}
+          <ul className="flex flex-col divide-y divide-slate-100 rounded-xl border border-slate-200">
+            {result.factors.map((factor, index) => {
+              const Icon = factor.icon
+              return (
+                <motion.li
+                  key={factor.key}
+                  initial={reducedMotion ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  /* Lands just behind the panel it sits in, not a beat later. */
+                  transition={{ duration: 0.28, ease: EASE_OUT, delay: 0.3 + index * 0.07 }}
+                  className="flex items-start gap-3.5 p-4"
+                >
+                  <span
+                    className={cn(
+                      "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                      styles.bg,
+                      styles.text
+                    )}
+                    aria-hidden="true"
+                  >
+                    <Icon className="size-4.5" />
+                  </span>
+
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-slate-900">
+                      {factor.label}
+                      <span
+                        className={cn(
+                          "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide tabular-nums",
+                          styles.badge
+                        )}
+                      >
+                        +{factor.points} pkt
+                      </span>
+                    </p>
+                    <p className="text-sm leading-relaxed text-slate-600">{factor.detail}</p>
+                  </div>
+                </motion.li>
+              )
+            })}
+          </ul>
+        </div>
       </div>
     </div>
   )
